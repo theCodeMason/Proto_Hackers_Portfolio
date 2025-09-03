@@ -1,5 +1,5 @@
 const valueStore = {
-  version: "Ken's Key-Value Store 1.0"
+  version: "Mason's Key-Value Store 1.1"
 }
 
 function hasCharacter(str, char) {
