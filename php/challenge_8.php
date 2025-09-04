@@ -1,5 +1,4 @@
 <?php
-// ProtoHackers #8 — Priority Toy Workshop (PHP, non-blocking, multi-client)
 
 // ====== Helpers ======
 function sock_id($sock) {
@@ -16,7 +15,6 @@ $fn_reverse = function($b, $pos) {
 };
 $fn_xor_pos = function($b, $pos) { return $b ^ ($pos & 0xFF); };
 $fn_add_pos = function($b, $pos) { return ($b + ($pos & 0xFF)) & 0xFF; };
-// (sub_pos not needed directly; dec is handled via inverse LUTs)
 
 function make_xor_n($n) { $n &= 0xFF; return fn($b,$p)=>($b ^ $n) & 0xFF; }
 function make_add_n($n) { $n &= 0xFF; return fn($b,$p)=>(($b + $n) & 0xFF); }
