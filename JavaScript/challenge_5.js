@@ -1,53 +1,86 @@
-const net = require('node:net')
+const net = require('net');
 
-const server = net.createServer()
+const PORT = 40000;
+const TONYS_WALLET = '7YWHMfk9JZe0LM0g1ZauHuiSxhI';
 
-server.listen(40000, '0.0.0.0', () => {
-  console.log('server listening on 40000')
-})
 
-server.on('connection', (socket) => {
-  console.log('client connected')
+function setupServer(connectionHandler) {
+  const server = net.createServer()
+    .listen(PORT, () => {
+      console.log(`server started on ${PORT}`);
+    });
 
-  const client = net.createConnection(16963, 'chat.protohackers.com')
+  server.on('connection', (socket) => {
+    connectionHandler(socket);
+  });
+}
 
-  client.on('data', (data) => {
-    const response = data.toString('utf-8')
+async function connectionHandler(downstream) {
+  const sessionId = `${downstream.remoteAddress}:${downstream.remotePort}`;
+  console.log(`${sessionId} | client connected`);
 
-    const res = response.replace(/\n/g, '').split(' ').map(split => (
-      split.replace(/^7+[A-z|0-9]{25,34}$/g, '7YWHMfk9JZe0LM0g1ZauHuiSxhI'))
-    ).join(' ')
+  const upstream = net.connect({ host: 'chat.protohackers.com', port: 16963 });
 
-    socket.write(res + '\n')
-  })
+  downstream.on('error', (err) => {
+    console.log(`${sessionId} | error ${err}`);
+  });
 
-  let request = ''
+  downstream.on('close', () => {
+    console.log(`${sessionId} | client disconnected`);
+    upstream.destroy();
+  });
 
-  socket.on('data', (data) => {
-    request += data.toString('utf-8')
-    // Wait to get full message
-    if (input[input.length - 1] !== '\n') {
-      return
+  handleChat(downstream, upstream);
+}
+
+function handleChat(downstream, upstream) {
+
+  let messageBuffer = '';
+  downstream.on('data', (chunk) => {
+    const receivedDataString = Buffer.from(chunk).toString('ascii');
+    messageBuffer += receivedDataString;
+
+    if (!receivedDataString.endsWith('\n')) {
+      return;
     }
 
-    request = request.replace(/\n/g, '')
+    console.log('message received from downstream', messageBuffer);
+    sendMessage({ socket: upstream }, messageBuffer);
 
-    const req = request.split(' ').map(split => (
-      split.replace(/^7+[A-z|0-9]{25,34}$/g, '7YWHMfk9JZe0LM0g1ZauHuiSxhI'))
-    ).join(' ')
+    messageBuffer = '';
+  });
 
-    client.write(req + '\n')
+  let upstreamMessageBuffer = '';
+  upstream.on('data', (chunk) => {
+    const receivedDataString = Buffer.from(chunk).toString('ascii');
+    upstreamMessageBuffer += receivedDataString;
 
-    request = ''
-  })
+    if (!receivedDataString.endsWith('\n')) {
+      return;
+    }
 
-  socket.on('close', () => {
-    console.log('client disconnected')
+    console.log('message received from upstream', upstreamMessageBuffer);
 
-    client.destroy()
-  })
+    sendMessage({ socket: downstream }, upstreamMessageBuffer);
 
-  socket.on('error', (err) => {
-    console.log('error', err)
-  })
-})
+    upstreamMessageBuffer = '';
+  });
+}
+
+function sendMessage(receiverCLient, message) {
+  const { socket } = receiverCLient;
+
+  let payload = message
+    .replace(/\n/g, '')
+    .split(' ')
+    .map(split => split.replace(/^7+[A-z|0-9]{25,34}$/g, TONYS_WALLET))
+    .join(' ') + '\n';
+
+  socket.write(payload);
+}
+
+async function main() {
+  setupServer(connectionHandler);
+}
+
+main();
